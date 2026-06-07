@@ -1,0 +1,6 @@
+experiment_id,alloy_family,aging_temperature_c,aging_time_h,hardness_hbw,elongation_percent,cost_delta_percent,note
+exp_001,AA-demo,170,4,118,9.8,0.4,baseline short aging
+exp_002,AA-demo,190,8,132,8.9,0.5,higher hardness after adjusted aging
+exp_003,AA-demo,190,48,121,8.2,0.5,possible overaging signal
+exp_004,AA-demo,190,8,138,,6.5,sc route has missing ductility and high cost
+exp_005,AA-demo,190,8,134,8.7,2.5,zr-assisted route lower cost than sc route

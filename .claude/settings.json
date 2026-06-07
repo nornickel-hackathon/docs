@@ -1,0 +1,7 @@
+{
+  "permissions": { "defaultMode": "acceptEdits" },
+  "context": ["AGENTS.md", "AGENT_RULES.md", "PROJECT_CONTEXT.md", "DEFINITION_OF_DONE.md"],
+  "hooks": {
+    "preCommit": "cargo clippy --workspace -- -D warnings && ruff check sidecar && pnpm -C web lint"
+  }
+}

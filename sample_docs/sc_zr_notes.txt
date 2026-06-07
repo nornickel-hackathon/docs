@@ -1,0 +1,16 @@
+Title: Scandium and zirconium additions in aluminum alloys
+Source: literature summary for demo corpus
+
+Demo excerpt:
+Scandium additions in aluminum alloys are often discussed as a route to grain refinement,
+dispersoid formation and strengthening. The same direction may carry a cost risk because
+scandium is expensive compared with ordinary process-window changes.
+
+Zirconium additions can support thermally stable dispersoids and may be explored as a partial
+substitution route when the cost of scandium is too high for a target KPI contract.
+
+Expected extracted claims:
+- Scandium-containing dispersoids can refine grain structure and contribute to strengthening.
+- Scandium additions are expensive and can violate a strict cost constraint.
+- Zirconium may partially substitute expensive scandium additions in a cheaper route.
+
