@@ -2,15 +2,15 @@
 
 ## Файлы задач по ролям
 - `rust_tasks.md` — Роль 1: Rust Track.
-- `agent_tasks.md` — Роль 2: Python Agent.
+- `python_tasks.md` — Роль 2: Python Agent.
 - `frontend_tasks.md` — Роль 3: Frontend.
 - `demo_data_qa_tasks.md` — Роль 4: Demo/Data/QA.
 
 ## Готовые prompt-файлы для агентов
-- `user_1.md` — отдать Rust-разработчику.
-- `user_2.md` — отдать Python/Agent-разработчику.
-- `user_3.md` — отдать Frontend-разработчику.
-- `user_4.md` — отдать Demo/Data/QA участнику.
+- `prompt_rust.md` — отдать Rust-разработчику.
+- `prompt_python.md` — отдать Python/Agent-разработчику.
+- `prompt_frontend.md` — отдать Frontend-разработчику.
+- `prompt_demo_qa.md` — отдать Demo/Data/QA участнику.
 
 ## Agent-specific prompts
 - `agents/codex/*.md` — использовать, если участник работает через Codex.

@@ -9,7 +9,7 @@
 3. `ARCHITECTURE.md`
 4. `CONTRACTS.md`
 5. `AGENT_RULES.md`
-6. `agent_tasks.md`
+6. `python_tasks.md`
 
 После чтения кратко сформулируй план P0 и приступай к реализации.
 
@@ -17,7 +17,7 @@
 Ты отвечаешь за **Роль 2 — Python Agent**.
 
 ## Что нужно сделать
-Выполни P0 из `agent_tasks.md`:
+Выполни P0 из `python_tasks.md`:
 - FastAPI service;
 - Pydantic-модели по `CONTRACTS.md`;
 - `GET /health`;

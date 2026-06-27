@@ -5,17 +5,17 @@
 2. **CONTRACTS.md** — JSON-контракты между Rust, Python и frontend.
 3. **ARCHITECTURE.md** — как устроены Rust Track, Python Agent, Frontend и Demo/Data/QA.
 4. **TASKS.md** — независимая раздача работ на 4 человека.
-5. Role-specific задачи: **rust_tasks.md**, **agent_tasks.md**, **frontend_tasks.md**,
+5. Role-specific задачи: **rust_tasks.md**, **python_tasks.md**, **frontend_tasks.md**,
    **demo_data_qa_tasks.md**.
-6. Готовые prompt-файлы для агентов: **user_1.md**, **user_2.md**, **user_3.md**,
-   **user_4.md**.
+6. Готовые prompt-файлы: **prompt_rust.md**, **prompt_python.md**, **prompt_frontend.md**,
+   **prompt_demo_qa.md**.
 
 ## Быстрый старт для участников
 
-- Rust-разработчик получает **user_1.md**.
-- Python/Agent-разработчик получает **user_2.md**.
-- Frontend-разработчик получает **user_3.md**.
-- Demo/Data/QA получает **user_4.md**.
+- Rust-разработчик получает **prompt_rust.md**.
+- Python/Agent-разработчик получает **prompt_python.md**.
+- Frontend-разработчик получает **prompt_frontend.md**.
+- Demo/Data/QA получает **prompt_demo_qa.md**.
 
 Если заранее известно, каким агентом пользуется участник, лучше дать agent-specific prompt:
 - Codex: `agents/codex/rust.md`, `agents/codex/agent.md`, `agents/codex/frontend.md`,

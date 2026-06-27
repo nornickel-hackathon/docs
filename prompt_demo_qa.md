@@ -1,4 +1,4 @@
-# user_4.md — Prompt для Demo/Data/QA
+# prompt_demo_qa.md — Prompt для Demo/Data/QA
 
 Ты работаешь в проекте “Фабрика гипотез”. Твоя роль: **Роль 4 — Demo/Data/QA**.
 

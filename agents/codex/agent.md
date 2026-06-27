@@ -9,13 +9,13 @@
 3. `ARCHITECTURE.md`
 4. `CONTRACTS.md`
 5. `AGENT_RULES.md`
-6. `agent_tasks.md`
+6. `python_tasks.md`
 
 ## Роль
 Ты выполняешь **Роль 2 — Python Agent**.
 
 ## Задача
-Реализуй только P0 из `agent_tasks.md`.
+Реализуй только P0 из `python_tasks.md`.
 
 Сделай:
 - FastAPI service в `sidecar`;

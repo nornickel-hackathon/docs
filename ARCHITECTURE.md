@@ -23,9 +23,10 @@ Engine не содержит доменных слов. Слова вроде `a
 Python Agent — волатильный слой извлечения.
 
 Ответственность:
-- парсинг `txt/html/pdf` в текст;
-- mock extraction для стабильного демо;
-- optional LLM extraction по Pydantic-схеме;
+- парсинг `txt/html/pdf/csv` в текст;
+- **Entity Resolver**: нормализация синонимов материалов/процессов (Al-7075 = AA7075 = Aluminum 7075) через rules + fuzzy matching + LLM judge; неуверенные кластеры — в очередь эксперту;
+- LLM extraction: claims по Pydantic-схеме, confidence ≥ 0 установлен LLM;
+- mock extraction для стабильного демо (возвращает `fixtures/extract_response.json`);
 - endpoint `POST /extract`;
 - возврат только JSON: `claims`, `entities`, `edges`.
 
@@ -74,6 +75,16 @@ sample_docs/
 - `GET /board`: отдаёт текущий `BoardResponse`.
 - `GET /hypothesis/:id`: отдаёт одну гипотезу.
 - `POST /rerun`: меняет веса/constraints/excluded factors и пересчитывает ranking.
+
+## Три механизма генерации гипотез (engine)
+
+**Gap-based** — оператор `gap`: factor A связан с KPI, factor B связан с KPI, но комбинация A+B в corpus не проверялась → гипотеза «проверить A+B».
+
+**Contradiction-based** — оператор `contradiction`: два claim с противоположным polarity на одном edge при разных conditions → гипотеза «определить граничное условие, при котором эффект меняет знак».
+
+**Analogy-based** — оператор `analogy_transfer`: в узле X есть подтверждённый mechanism-path до KPI; узел Y имеет совпадающие теги без покрытого пути → гипотеза «перенести механизм X на Y».
+
+Все три оператора работают только над `EdgeType` и тегами узлов. Никаких доменных слов в коде.
 
 ## Принцип независимой разработки
 Все компоненты разрабатываются против fixtures и контрактов.

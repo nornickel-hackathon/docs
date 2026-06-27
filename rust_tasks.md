@@ -31,13 +31,13 @@ pub fn discover(graph: &Graph, contract: &KpiContract, pack: &DomainPack) -> Boa
    - `mechanism_path`: идти от KPI назад по `mechanism`/`proxy` edges до `controllable` factors;
    - `substitution`: учитывать `substitution` edges как альтернативный factor;
    - `gap`: создавать/помечать hypothesis как `needs_expert_review`, если constraint не покрыт claims.
-6. Реализовать scoring:
-   - `kpi_impact`;
-   - `evidence`;
-   - `plausibility`;
-   - `cost`;
-   - `risk`;
-   - `novelty`.
+6. Реализовать scoring (формулы — в `docs/SCORING.md`):
+   - `kpi_impact` — сила причинного пути до KPI, взвешенная по confidence claims;
+   - `evidence` — полнота trace (mean confidence × len(trace)/3);
+   - `plausibility` — доля grounded рёбер (literature/experimental vs inferred);
+   - `cost` — инверсия cost_delta относительно constraint;
+   - `risk` — штраф за missing_evidence и contradictions;
+   - `novelty` — повышается если гипотеза из gap-оператора (комбинация не в корпусе).
 7. Реализовать hard constraints:
    - нарушение `cost <= 5%` даёт `rejected_by_constraints`;
    - непокрытая `ductility_loss` даёт `needs_expert_review` или risk flag.
