@@ -3,38 +3,44 @@
 Pack — это **вся доменная семантика**, вынесенная из ядра в один файл (`packs/<name>.yaml`).
 Меняешь pack → меняешь домен. Ядро не пересобирается. Это и есть «честная универсальность».
 
-## Схема pack
+## Схема pack (актуальный: `packs/flotation-v1.yaml`)
 ```yaml
-id: alloys-v1
+id: flotation-v1
 units:                      # нормализация единиц
-  strength: MPa
-  temperature: C
+  size_class: um
+  reagent_dosage: g_per_t
 node_types:                 # какие бывают узлы графа
   - factor                  # управляемый рычаг (tag: controllable)
   - mechanism
-  - property
+  - property                # сюда же диагноз-узлы (tag: diagnosis)
   - kpi                     # цель (tag: kpi)
 edge_types:                 # типы рёбер, по которым ходят generic-операторы
   - mechanism               # факт «A влияет на B через механизм»
-  - tradeoff                # «A улучшает X, но ухудшает Y»
-  - substitution            # «A заменяем на B»
+  - tradeoff                # «A улучшает X, но ухудшает Y» (стабильный помол → шламы)
+  - substitution            # «A заменяем на B» (грохот ↔ гидроциклон)
 operators:                  # какие generic-операторы включены для домена
   - mechanism_path
   - substitution
-  - process_window
+  - gap
 scoring_weights:            # читает Scoring-движок в engine
-  kpi_impact: 0.30
-  evidence: 0.25
+  kpi_impact: 0.35          # ∝ addressable_tons × gain × price
+  evidence: 0.20
   plausibility: 0.15
   cost: 0.15
   risk: 0.10
   novelty: 0.05
-hard_constraints:           # нарушение → status=Rejected by constraints (фильтр, не штраф)
-  - { kpi: cost, op: "<=", value: 5, unit: "%" }
-skeptic_rules:              # читает Skeptic-rules engine в engine
+hard_constraints:           # нарушение → status=rejected_by_constraints (фильтр, не штраф)
+  - { metric: capex_class, op: "<=", value: 3 }
+skeptic_rules:              # читает Skeptic-rules engine
   - id: uncovered_constraint
     when: "kpi_contract has constraint with no claim on that property"
     flag: "Need expert review: <property> impact not evidenced"
+diagnosis_config:           # читают /diagnose (sidecar) И engine — вся логика диагностики
+  size_class_groups: { coarse: [...], medium: [...], fine: [-10] }
+  recoverability: { element_28: [open_pnt_cp, closed_pnt_cp, millerite], element_29: [...] }
+  rules: [ { diagnosis: liberation_deficit, when: {...} }, ... ]
+synonyms:                   # словарь Entity Resolver (sidecar)
+  hydrocyclone: [гидроциклон, циклон, ГЦ, ГЦ-660]
 ```
 
 ## Как ядро это читает (generic)

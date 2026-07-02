@@ -1,33 +1,50 @@
-# WORKED_EXAMPLE.md — Sc + aging через generic-операторы
+# WORKED_EXAMPLE.md — «насадки гидроциклона» через generic-операторы
 
-Цель — показать команде, что «абстрактный обход» это не лозунг, а конкретный код,
-который не знает ни слова «сплав».
+Цель — показать, что «абстрактный обход» это не лозунг, а конкретный код, который
+не знает ни слова «флотация». Этот пример — эталон для юнит-теста engine
+(полные данные — `fixtures/extract_response.json` + `fixtures/diagnostics_kgmk.json`).
 
 ## Вход (всё — данные, не код)
-KPI-контракт: `strength target +10%`, ограничение `cost <= +5%`, `ductility drop <= 3%`.
+KPI-контракт: `recoverable_losses_element_28 decrease`, ограничение `capex_class <= 3`,
+цена `element_28 = 16500 $/t`.
+
+Диагностика (из `/diagnose`, детерминированно): диагноз-узел `node_diag_liberation_deficit`
+получает `addressable_tons = { element_28: 4794 }` — столько тонн потерь классифицировано
+как «недораскрытие сростков» (закрытый Pnt/Cp в крупных классах).
+
 Claims (из сайдкара):
-- C1 [paper2018]: «Sc 0.1–0.3% измельчает зерно в Al-сплавах»
-  → edge `Sc --mechanism(grain_refinement)--> microstructure`, Sc.tags=[controllable]
-- C2 [handbook]: «измельчение зерна повышает прочность (Hall-Petch)»
-  → edge `microstructure --mechanism(hall_petch)--> strength`, strength.tags=[kpi]
-- C3 [report2019]: «Sc дорогой, +6% к стоимости»
-  → cost-аннотация на рычаге Sc
+- C1 [учебник, стр. 212]: «уменьшение насадки ГЦ смещает границу разделения в тонкую сторону»
+  → edge `node_hydrocyclone_nozzle --mechanism--> node_separation_size`, nozzle.tags=[controllable]
+- C2 [учебник, стр. 148]: «возврат крупных классов на доизмельчение повышает раскрытие»
+  → цепочка `separation_size → regrind_circuit → liberation`
+- C3 [методичка кейса]: «закрытые зёрна в крупных классах извлекаемы после доизмельчения»
+  → edge `liberation --mechanism--> node_diag_liberation_deficit` (polarity negative)
+- C17 [учебник, стр. 176]: «улучшение классификации даёт прирост раскрытия 5–15%»
+  → gain_range для economic_effect
+
+Граф: `node_diag_liberation_deficit --mechanism--> node_recoverable_losses_element_28` (tag kpi).
 
 ## Что делает engine (generic)
-1. Старт у узла с tag `kpi` = `strength`.
-2. Оператор `mechanism_path`: идём по **incoming** рёбрам типа `mechanism`, пока не упрёмся
-   в узел с tag `controllable`. Путь: `strength ← hall_petch ← microstructure ← grain_refinement ← Sc`.
-   → кандидат «поднять Sc 0.1–0.3%». **Оператор не знает слов Sc / Hall-Petch** — только
-   `edge_type=mechanism` и `tag=controllable`.
-3. Scoring (веса из pack): evidence=2 грунтованных claim'а, plausibility=2 известных механизма,
-   cost из C3 = +6%.
-4. Хард-фильтр `cost <= +5%` → **нарушен** → если строго, статус `Rejected by constraints`;
-   либо ищем substitution-оператором более дешёвый рычаг с тем же путём к strength.
-5. Skeptic-rule `uncovered_constraint`: в контракте есть `ductility`, но ни один claim его не
-   покрывает → флаг «Need expert review: DOE обязан измерить пластичность».
-6. Сборка `Hypothesis{ trace:[C1,C2,C3], score_breakdown, status, doe_plan }`.
+1. Старт у узла с tag `kpi`.
+2. Оператор `mechanism_path`: идём по **incoming** рёбрам типа `mechanism` через узел
+   с tag `diagnosis` и `addressable_tons > 0`, пока не упрёмся в узел с tag `controllable`.
+   Путь: `kpi ← diag_liberation_deficit ← liberation ← regrind ← separation_size ← nozzle`.
+   **Оператор не знает слов «гидроциклон» и «сростки»** — только edge_type и теги.
+3. Доступность: у `nozzle` есть `equipment_required: hydrocyclone`; в `factories/kgmk.yaml`
+   hydrocyclone `present: true` → рычаг доступен. (Будь он недоступен — хард-фильтр
+   `equipment_not_available`, а оператор `gap` предложил бы недоступные рычаги как
+   «новое оборудование», capex_class 3.)
+4. Экономика: `value_usd_range = 4794 т × [5..15]% × 16500 $/т = [$3.96M .. $11.87M]`.
+   `assumptions` заполняются из источников чисел.
+5. Scoring (веса из pack): `kpi_impact` от value (нормировано на максимум портфеля),
+   evidence = 4 claims, plausibility = связность механизма, cost = capex_class 1.
+6. Хард-фильтр `capex_class <= 3` — проходит. Статус по порогу score_total.
+7. Skeptic-rule `uncovered_constraint`: если constraint-метрика не покрыта claims → флаг.
+8. Сборка `Hypothesis{ trace:[C1,C2,C3,C17, diag-ссылка], economic_effect, score, doe_plan }`.
 
 ## Мораль
-Sc, Hall-Petch, MPa, порог cost — всё в claims и pack (данные).
-В `crates/engine` лежит только `follow_incoming(edge_type, until: tag)`, scoring-формула и rule-engine.
-Сменили домен → меняются claims и pack, обход тот же.
+Гидроциклон, Pnt/Cp, тонны, цена — всё в claims, diagnostics и pack (данные).
+В `crates/engine` лежит только `follow_incoming(edge_type, until: tag)`, scoring-формула
+и rule-engine. Смена домена (катализаторы, лекарства) → новый pack + новые claims,
+обход тот же. Тест: результат этого примера должен совпадать с `fixtures/board.json`
+по топ-гипотезе (hyp_001, «насадки 12→8»).

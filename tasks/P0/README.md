@@ -1,3 +1,5 @@
+> ⚠️ Бэклог написан до пивота на флотационный кейс: имена данных сменились (flotation-v1, diagnostics, factories). Актуальные задачи — docs/prompt_*.md + docs/FINAL_SPRINT.md.
+
 # P0 — Foundational Sprint
 
 > **Авторитетный источник задач MVP — `TASKS.md` и role-specific файлы `*_tasks.md`.**

@@ -1,20 +1,98 @@
 # CONTRACTS.md — единый источник контракта
 
 Это главный справочник. Все остальные файлы ссылаются сюда, но не дублируют.
+Домен кейса: флотация Cu-Ni руд, минимизация потерь металлов с хвостами.
+«Элемент 28» и «Элемент 29» — анонимизированные металлы из данных кейса; **в коде никогда
+не раскрываем**, работаем с `element_28` / `element_29`, цены — параметры KpiContract.
 
 ## Общие правила
-- JSON: `snake_case`, id — стабильные строки (`claim_001`, `node_strength`, `hyp_001`).
+- JSON: `snake_case`, id — стабильные строки (`claim_001`, `node_hydrocyclone_nozzle`, `hyp_001`).
 - Frontend только отображает `BoardResponse` — не придумывает данные.
-- Python Agent только извлекает — не ставит `rank`, `score_total`, `status`.
+- Python Agent только извлекает и диагностирует — не ставит `rank`, `score_total`, `status`.
 - Rust API валидирует весь JSON от Python перед использованием.
 - Изменение любой структуры → обновить этот файл + регенерировать `web/src/contracts.ts` в том же PR.
 
-## Порты
-| Сервис | Порт |
-|--------|------|
-| Python sidecar | 8765 |
-| Rust platform (axum) | 8080 |
-| Frontend (Vite dev) | 5173 |
+## Порты и эндпоинты
+| Сервис | Порт | Эндпоинты |
+|--------|------|-----------|
+| Python sidecar | 8765 | `GET /health`, `POST /extract`, `POST /diagnose`, P1: `POST /novelty` |
+| Rust platform (axum) | 8080 | `GET /board`, `GET /hypothesis/:id`, `POST /run`, `POST /rerun`, `GET /export/board.{json,csv}` |
+| Frontend (Vite dev) | 5173 | — |
+
+---
+
+## DiagnoseRequest
+> Rust Platform → Python Sidecar при `POST /diagnose`
+
+```json
+{
+  "factory_id": "kgmk",
+  "file_path": "norn-hack/Пример 1/Хвосты КГМК.xlsx",
+  "pack_id": "flotation-v1"
+}
+```
+
+| `factory_id` | Фабрика |
+|---|---|
+| `"kgmk"` | Пример 1 — КГМК |
+| `"nof_vkr"` | Пример 2 — НОФ вкрапленная |
+| `"nof_med"` | Пример 3 — НОФ медистая |
+| `"tof"` | Пример 4 — ТОФ (две секции хвостов: породные + пирротиновые) |
+
+---
+
+## DiagnosticsReport
+> Python Sidecar → Rust Platform (ответ `POST /diagnose`). Детерминированный, БЕЗ LLM.
+
+```json
+{
+  "factory_id": "kgmk",
+  "pack_id": "flotation-v1",
+  "source_file": "norn-hack/Пример 1/Хвосты КГМК.xlsx",
+  "sections": ["rock"],
+  "totals": {
+    "tails_smt": 5824591,
+    "element_28": { "pct": 0.1784, "tons": 10392.3 },
+    "element_29": { "pct": 0.0726, "tons": 4229.7 }
+  },
+  "loss_cells": [
+    {
+      "section": "rock",
+      "size_class": "+71",
+      "mineral_form": "closed_pnt_cp",
+      "element": "element_28",
+      "tons": 2088.3,
+      "share_of_class_pct": 77.9,
+      "recoverable": true,
+      "diagnosis": "liberation_deficit",
+      "cell_ref": "Итог!E44"
+    }
+  ],
+  "diagnosis_summary": [
+    { "diagnosis": "liberation_deficit",  "element": "element_28", "tons": 3005.0 },
+    { "diagnosis": "slimes_overgrinding", "element": "element_28", "tons": 856.7 },
+    { "diagnosis": "flotation_kinetics",  "element": "element_28", "tons": 512.4 },
+    { "diagnosis": "not_recoverable",     "element": "element_28", "tons": 1130.9 }
+  ],
+  "data_quality": [
+    { "issue": "ref_error", "location": "Итог! секция +125", "handling": "treated_as_zero" },
+    { "issue": "checksum_mismatch", "location": "класс -10, element_29", "handling": "reported", "delta_pct": 1.8 }
+  ]
+}
+```
+
+| Поле | Правила |
+|------|---------|
+| `sections[]` | `"rock"` (породные) и/или `"pyrrhotite"` (пирротиновые — есть только у ТОФ) |
+| `size_class` | как в отчёте: `"+125"`, `"-125 +71"` / `"+71"`, `"-71 +45"`, `"-45 +20"`, `"-20 +10"`, `"-10"` |
+| `mineral_form` | `"open_pnt_cp"` \| `"closed_pnt_cp"` \| `"pyrrhotite_impurity"` \| `"silicate_valleriite"` \| `"pyrite_other_sulfides"` \| `"millerite"` |
+| `recoverable` | по карте `recoverability` из pack: (element × mineral_form) → bool |
+| `diagnosis` | id из pack: `liberation_deficit` \| `slimes_overgrinding` \| `flotation_kinetics` \| `not_recoverable` |
+| `cell_ref` | `лист!ячейка` тоннажа — обязателен, на нём держится trace до исходника |
+| `data_quality[].issue` | `"ref_error"` \| `"merged_cell"` \| `"empty_slot"` \| `"checksum_mismatch"` \| `"parse_warning"` |
+
+Самопроверка парсера: суммы loss_cells по классу сверяются со строкой «Итого (проверка)»,
+извлекаемость — со строкой «Извлекаемый металл»; расхождение > 1% → `checksum_mismatch`.
 
 ---
 
@@ -24,19 +102,18 @@
 ```json
 {
   "docs": [
-    { "path": "sample_docs/aging_2618a.txt", "mime": "text/plain" },
-    { "path": "sample_docs/internal_experiments.csv", "mime": "text/csv" }
+    { "path": "norn-hack/Дополнительные материалы/geokniga-flotacionnye-metody-obogashcheniya_0.pdf", "mime": "application/pdf" },
+    { "path": "docs/sample_docs/flotation/flotation_kinetics_notes.txt", "mime": "text/plain" },
+    { "path": "docs/sample_docs/open/mdpi_pentlandite_fines_2023.pdf", "mime": "application/pdf" }
   ],
-  "pack_id": "alloys-v1"
+  "pack_id": "flotation-v1"
 }
 ```
-
-Rust сканирует папку пользователя, собирает пути и mime-типы.
 
 | Поле | Тип | Описание |
 |------|-----|----------|
 | `docs[].path` | string | путь к файлу (относительный от корня проекта) |
-| `docs[].mime` | enum | `"text/plain"` \| `"text/csv"` \| `"application/pdf"` (PDF — P1) |
+| `docs[].mime` | enum | `"text/plain"` \| `"text/csv"` \| `"application/pdf"` |
 | `pack_id` | string | id domain pack, используется для нормализации |
 
 ---
@@ -46,13 +123,19 @@ Rust сканирует папку пользователя, собирает п
 
 ```json
 {
-  "pack_id": "alloys-v1",
+  "pack_id": "flotation-v1",
   "documents": [
     {
-      "id": "doc_aging_2618a",
-      "title": "Long-term aging of S-phase in aluminum alloy 2618A",
-      "path": "sample_docs/aging_2618a.txt",
-      "source_url": "https://link.springer.com/article/10.1007/s10853-020-05740-x"
+      "id": "doc_flotation_methods",
+      "title": "Флотационные методы обогащения",
+      "path": "norn-hack/Дополнительные материалы/geokniga-flotacionnye-metody-obogashcheniya_0.pdf",
+      "source_url": null
+    },
+    {
+      "id": "doc_mdpi_fines",
+      "title": "Recovery of fine pentlandite particles by flotation",
+      "path": "docs/sample_docs/open/mdpi_pentlandite_fines_2023.pdf",
+      "source_url": "https://www.mdpi.com/2075-163X/13/2/0000"
     }
   ],
   "claims": [],
@@ -61,7 +144,7 @@ Rust сканирует папку пользователя, собирает п
 }
 ```
 
-`source_url` — опциональный, `null` для внутренних документов.
+`source_url` — обязателен для открытых источников (бонус жюри), `null` для материалов кейса.
 
 ---
 
@@ -70,20 +153,23 @@ Rust сканирует папку пользователя, собирает п
 ```json
 {
   "id": "claim_001",
-  "text": "Artificial aging changes precipitate state and affects hardness.",
-  "source_ref": "doc_aging_2618a",
-  "confidence": 0.88,
+  "text": "Уменьшение диаметра песковой насадки гидроциклона смещает границу разделения в тонкую сторону и снижает долю крупных классов в сливе.",
+  "source_ref": "doc_flotation_methods",
+  "source_page": 214,
+  "confidence": 0.85,
   "evidence_type": "literature"
 }
 ```
 
 | `evidence_type` | Когда использовать |
 |----------------|-------------------|
-| `"literature"` | факт из научной статьи или справочника |
-| `"experiment"` | факт из CSV/таблицы с экспериментальными данными |
-| `"expert_note"` | комментарий эксперта в тексте документа |
+| `"literature"` | факт из учебника, статьи, справочника |
+| `"experiment"` | факт из таблицы с данными (в т.ч. xlsx хвостов) |
+| `"expert_note"` | комментарий эксперта в документе (методичка «Как читать отчет») |
 | `"data_gap"` | явное указание на отсутствие данных |
 | `"inferred"` | LLM вывел по косвенным признакам (ставить низкий confidence) |
+
+`source_page` — обязателен для PDF (на нём держится «trace до страницы»), `null` для txt/csv.
 
 ---
 
@@ -91,29 +177,39 @@ Rust сканирует папку пользователя, собирает п
 
 ```json
 {
-  "id": "node_aging_time",
+  "id": "node_hydrocyclone_nozzle",
   "kind": "factor",
-  "label": "aging time",
+  "label": "диаметр песковой насадки гидроциклона",
   "tags": ["controllable"],
-  "properties": { "unit": "h", "estimated_cost_delta_percent": 0.5 }
+  "properties": {
+    "unit": "inch",
+    "capex_class": 1,
+    "equipment_required": "hydrocyclone"
+  }
 }
 ```
 
-| `kind` | Смысл |
-|--------|-------|
-| `"factor"` | управляемый параметр процесса |
-| `"mechanism"` | промежуточное физическое явление |
-| `"property"` | измеримое свойство материала |
-| `"kpi"` | целевой или ограничивающий показатель |
+| `kind` | Смысл | Примеры узлов |
+|--------|-------|--------------|
+| `"factor"` | управляемый рычаг: настройка/замена оборудования, режим, реагент | насадка ГЦ, футеровка мельницы, плотность пульпы, время агитации, реагент |
+| `"mechanism"` | промежуточное физическое явление | граница разделения классификации, раскрытие сростков, кинетика флотации |
+| `"property"` | измеримое свойство потока/продукта; **сюда же диагнозы потерь** | `node_loss_liberation_deficit`, гранулометрия слива |
+| `"kpi"` | целевой или ограничивающий показатель | `node_recoverable_losses_element_28` |
 
 | `tags[]` | Смысл |
 |----------|-------|
-| `"controllable"` | фактор, которым можно управлять в эксперименте |
+| `"controllable"` | рычаг, которым можно управлять |
 | `"kpi"` | целевой KPI (engine идёт от него назад) |
-| `"constraint"` | KPI, который нельзя нарушать (cost, ductility_loss) |
-| `"kpi_proxy"` | свойство, которое косвенно отражает KPI (hardness ≈ strength) |
+| `"constraint"` | KPI-ограничение (capex, производительность) |
+| `"kpi_proxy"` | свойство, косвенно отражающее KPI |
+| `"diagnosis"` | property-узел диагноза потерь; получает `addressable_tons` из DiagnosticsReport |
 
-`properties` — свободный объект; `unit` и `estimated_cost_delta_percent` — рекомендуемые поля.
+`properties` рычагов: `capex_class` — 1 = настройка режима, 2 = замена узла/детали,
+3 = новое оборудование; `equipment_required` — id оборудования из `factories/<factory_id>.yaml`
+(рычаг без такого оборудования на фабрике отсекается хард-фильтром `equipment_not_available`).
+
+Диагноз-узлы (`tags: ["diagnosis"]`) создаются platform-ом из pack и получают
+`properties.addressable_tons = { "element_28": 3005.0, "element_29": 411.2 }` из `diagnosis_summary`.
 
 ---
 
@@ -122,21 +218,21 @@ Rust сканирует папку пользователя, собирает п
 ```json
 {
   "id": "edge_001",
-  "src": "node_aging_time",
-  "dst": "node_precipitate_state",
+  "src": "node_hydrocyclone_nozzle",
+  "dst": "node_separation_size",
   "edge_type": "mechanism",
-  "mechanism": "precipitate_evolution",
-  "source_claims": ["claim_001", "claim_003"],
-  "polarity": "positive"
+  "mechanism": "classification_cut_size",
+  "source_claims": ["claim_001", "claim_007"],
+  "polarity": "negative"
 }
 ```
 
 | `edge_type` | Смысл |
 |-------------|-------|
-| `"mechanism"` | причинная связь: фактор/механизм влияет на другой узел |
-| `"proxy"` | косвенная связь (hardness → strength) |
-| `"tradeoff"` | отрицательный побочный эффект (Sc → cost) |
-| `"substitution"` | альтернативный путь с тем же эффектом (Zr ↔ Sc) |
+| `"mechanism"` | причинная связь: рычаг/механизм влияет на узел |
+| `"proxy"` | косвенная связь |
+| `"tradeoff"` | отрицательный побочный эффект (переизмельчение → шламы) |
+| `"substitution"` | альтернативный рычаг с тем же эффектом (грохот ↔ гидроциклон) |
 
 | `polarity` | Смысл |
 |-----------|-------|
@@ -152,21 +248,23 @@ Rust сканирует папку пользователя, собирает п
 
 ```json
 {
+  "factory_id": "kgmk",
   "target": {
-    "metric": "strength",
-    "direction": "increase",
+    "metric": "recoverable_losses_element_28",
+    "direction": "decrease",
     "minimum_delta_percent": 10
   },
   "constraints": [
-    { "metric": "cost", "op": "<=", "value": 5, "unit": "percent" },
-    { "metric": "ductility_loss", "op": "<=", "value": 3, "unit": "percent" }
+    { "metric": "capex_class", "op": "<=", "value": 2, "unit": "class" }
   ],
+  "prices_usd_per_t": { "element_28": 16500, "element_29": 9500 },
   "weights_override": { "cost": 0.3 },
-  "excluded_factors": ["node_sc_addition"]
+  "excluded_factors": ["node_magnetic_separation"]
 }
 ```
 
-`weights_override` и `excluded_factors` — опциональны, только для rerun. `op`: `"<="` | `">="`.
+`prices_usd_per_t` — цены анонимизированных металлов, вводит пользователь (дефолты в fixtures).
+`weights_override` и `excluded_factors` — опциональны, для rerun. `op`: `"<="` | `">="`.
 
 ---
 
@@ -183,7 +281,28 @@ Rust сканирует папку пользователя, собирает п
 }
 ```
 
-Все поля `[0.0, 1.0]`. Формулы расчёта — в `docs/SCORING.md`. Веса — в `DomainPack.scoring_weights`.
+Все поля `[0.0, 1.0]`. `kpi_impact` считается от денег:
+`addressable_tons × mid(recovery_gain_pct_range)/100 × price`, нормировано на максимум по
+портфелю. Формулы — в `docs/SCORING.md`. Веса — в `DomainPack.scoring_weights`.
+
+---
+
+## EconomicEffect
+
+```json
+{
+  "addressable_tons": { "element_28": 3005.0 },
+  "recovery_gain_pct_range": [5, 15],
+  "value_usd_range": [2479125, 7437375],
+  "assumptions": [
+    "price element_28 = 16500 $/t (параметр KpiContract)",
+    "recovery gain range из claim_017 (консервативно)"
+  ]
+}
+```
+
+Вычисляет engine (не LLM): `value_usd = addressable_tons × gain/100 × price`, диапазон, не точка.
+`assumptions` — обязательное поле: каждое число объяснимо (требование интерпретируемости ТЗ).
 
 ---
 
@@ -191,9 +310,9 @@ Rust сканирует папку пользователя, собирает п
 
 ```json
 {
-  "objective": "Verify strength and ductility after adjusted aging.",
-  "factors": ["aging temperature", "aging time"],
-  "measurements": ["yield strength", "hardness", "elongation", "cost delta"],
+  "objective": "Проверить рост раскрытия закрытых сростков в классах +71/-71+45 после замены насадок.",
+  "factors": ["диаметр песковой насадки", "давление на входе ГЦ"],
+  "measurements": ["гранулометрия слива", "доля закрытого Pnt/Cp по классам", "извлечение element_28"],
   "minimum_runs": 6
 }
 ```
@@ -205,25 +324,33 @@ Rust сканирует папку пользователя, собирает п
 ```json
 {
   "id": "hyp_001",
-  "title": "Tune aging window to improve strength",
-  "summary": "Change aging time/temp to improve precipitate strengthening.",
+  "title": "Заменить песковые насадки гидроциклонов 12\" → 8\"",
+  "summary": "Смещение границы разделения вернёт крупные сростки на доизмельчение и снизит потери закрытого Pnt/Cp в классах +71 и -71+45.",
   "status": "recommended",
   "rank": 1,
   "score_total": 0.82,
   "score_breakdown": { },
-  "trace": ["claim_001", "claim_002", "claim_003"],
-  "source_nodes": ["node_aging_time", "node_precipitate_state", "node_strength"],
-  "risks": ["ductility impact needs direct measurement"],
-  "missing_evidence": ["no claim covers fatigue behavior"],
-  "doe_plan": { }
+  "economic_effect": { },
+  "trace": ["claim_001", "claim_007", "diag_kgmk_closed_71"],
+  "source_nodes": ["node_hydrocyclone_nozzle", "node_separation_size", "node_loss_liberation_deficit"],
+  "risks": ["рост циркулирующей нагрузки на мельницы — проверить производительность"],
+  "missing_evidence": ["нет claim о влиянии на извлечение element_29"],
+  "doe_plan": { },
+  "expert_match": null
 }
 ```
+
+`trace` может ссылаться и на claims, и на loss_cells диагностики (id вида `diag_<factory>_<n>` —
+platform присваивает при построении графа, фронт резолвит в `cell_ref` исходного xlsx).
+
+`expert_match` — заполняется QA-скриптом при benchmark:
+`null` | `{ "matched": true, "expert_hypothesis_id": "kgmk_h3" }`.
 
 | `status` | Условие назначения (код, не LLM) |
 |----------|----------------------------------|
 | `"recommended"` | `score_total >= 0.75` и нет нарушений hard constraint |
 | `"watch"` | `score_total >= 0.55` и нет нарушений |
-| `"rejected_by_constraints"` | нарушен любой `hard_constraint` из pack |
+| `"rejected_by_constraints"` | нарушен hard_constraint (включая `equipment_not_available`, `capex_class`) |
 | `"needs_expert_review"` | constraint-метрика не покрыта ни одним claim |
 
 ---
@@ -233,16 +360,17 @@ Rust сканирует папку пользователя, собирает п
 ```json
 {
   "snapshot": {
-    "id": "snapshot_demo_001",
-    "hash": "demo-hash-001",
-    "pack_id": "alloys-v1"
+    "id": "snapshot_kgmk_001",
+    "hash": "sha256:...",
+    "pack_id": "flotation-v1"
   },
   "kpi_contract": { },
+  "diagnostics": { },
   "hypotheses": []
 }
 ```
 
-`kpi_contract` нужен фронту для отображения активных ограничений и формы rerun.  
+`diagnostics` — полный `DiagnosticsReport` (фронту для heatmap и Data Readiness).
 `snapshot.hash` не меняется при rerun — меняется только ranking внутри `hypotheses[]`.
 
 ---
@@ -252,28 +380,68 @@ Rust сканирует папку пользователя, собирает п
 
 ```json
 {
-  "pack_id": "alloys-v1",
+  "pack_id": "flotation-v1",
   "scoring_weights": {
-    "kpi_impact":   0.30,
-    "evidence":     0.25,
+    "kpi_impact":   0.35,
+    "evidence":     0.20,
     "plausibility": 0.15,
     "cost":         0.15,
     "risk":         0.10,
     "novelty":      0.05
   },
   "hard_constraints": [
-    { "metric": "cost",           "op": "<=", "value": 5.0 },
-    { "metric": "ductility_loss", "op": "<=", "value": 3.0 }
+    { "metric": "capex_class", "op": "<=", "value": 3.0 }
   ],
   "enabled_operators": ["mechanism_path", "substitution", "gap"],
   "skeptic_rules": [
     { "rule": "uncovered_constraint",       "threshold": 0.0 },
     { "rule": "low_evidence_top_candidate", "threshold": 0.55 }
-  ]
+  ],
+  "diagnosis_config": {
+    "size_class_groups": {
+      "coarse": ["+125", "-125 +71", "+71", "-71 +45"],
+      "medium": ["-45 +20", "-20 +10"],
+      "fine":   ["-10"]
+    },
+    "recoverability": {
+      "element_28": ["open_pnt_cp", "closed_pnt_cp", "millerite"],
+      "element_29": ["open_pnt_cp", "closed_pnt_cp"]
+    },
+    "rules": [
+      { "diagnosis": "liberation_deficit",  "when": { "mineral_form": "closed_pnt_cp", "size_group": ["coarse"] } },
+      { "diagnosis": "slimes_overgrinding", "when": { "mineral_form": "open_pnt_cp",   "size_group": ["fine"] } },
+      { "diagnosis": "flotation_kinetics",  "when": { "mineral_form": "open_pnt_cp",   "size_group": ["coarse", "medium"] } },
+      { "diagnosis": "not_recoverable",     "when": { "recoverable": false } }
+    ]
+  }
 }
 ```
 
-`KpiContract.weights_override` перекрывает отдельные ключи `scoring_weights` на время rerun без изменения pack-файла.
+`diagnosis_config` читают и sidecar (`/diagnose` присваивает diagnosis каждой loss_cell),
+и engine (диагноз-узлы графа). Вся доменная семантика — здесь, не в коде.
+`KpiContract.weights_override` перекрывает отдельные ключи `scoring_weights` при rerun.
+
+---
+
+## FactoryConfig
+> `factories/<factory_id>.yaml` — оборудование фабрики (из схем флотации и регламентов кейса)
+
+```yaml
+factory_id: kgmk
+tails_sections: [rock]
+equipment:
+  - { id: ball_mill,           label: "Шаровые мельницы",        present: true }
+  - { id: hydrocyclone,        label: "Гидроциклоны",            present: true }
+  - { id: spiral_classifier,   label: "Спиральные классификаторы", present: true }
+  - { id: flotation_bank,      label: "Флотомашины",             present: true }
+  - { id: fine_screen,         label: "Грохота тонкого грохочения", present: false }
+  - { id: magnetic_separator,  label: "Магнитные сепараторы",    present: false }
+  - { id: contact_tank,        label: "Контактные чаны",         present: true }
+```
+
+Platform читает при `POST /run`: рычаг с `equipment_required`, отсутствующим или
+`present: false`, → хард-фильтр `equipment_not_available` (кроме гипотез от оператора `gap`,
+которые прямо предлагают новое оборудование и помечаются `capex_class: 3`).
 
 ---
 
@@ -283,19 +451,42 @@ Rust сканирует папку пользователя, собирает п
 pub type Graph = petgraph::DiGraph<GraphNode, GraphEdge>;
 ```
 
-Platform строит граф из `ExtractResponse`, передаёт `&Graph` в `engine::discover()`.  
-Engine граф не строит и не хранит.
+Platform строит граф из `ExtractResponse` + диагноз-узлов из `DiagnosticsReport`,
+передаёт `&Graph` в `engine::discover()`. Engine граф не строит и не хранит.
 
 ---
 
 ## RerunAction
 
 ```json
-{ "kind": "exclude_factor",   "payload": { "factor_id": "node_sc_addition" } }
+{ "kind": "exclude_factor",   "payload": { "factor_id": "node_magnetic_separation" } }
 { "kind": "change_weight",    "payload": { "dimension": "cost", "value": 0.3 } }
-{ "kind": "add_constraint",   "payload": { "metric": "cost", "op": "<=", "value": 3 } }
-{ "kind": "relax_constraint", "payload": { "metric": "cost", "op": "<=", "value": 10 } }
+{ "kind": "add_constraint",   "payload": { "metric": "capex_class", "op": "<=", "value": 1 } }
+{ "kind": "relax_constraint", "payload": { "metric": "capex_class", "op": "<=", "value": 3 } }
+{ "kind": "change_price",     "payload": { "element": "element_28", "usd_per_t": 21000 } }
 ```
+
+`change_price` пересчитывает `economic_effect` и `kpi_impact` всех гипотез — ranking может
+измениться, snapshot.hash — нет.
+
+---
+
+## ExpertHypothesis (golden set)
+> `golden/expert_hypotheses.json` — эталон из docx «Гипотезы» кейса, для benchmark
+
+```json
+{
+  "id": "kgmk_h3",
+  "factory_id": "kgmk",
+  "text": "Замена песковых насадок на гидроциклонах с уменьшением диаметра с 12 на 8",
+  "lever_type": "classification",
+  "diagnosis_hint": "liberation_deficit"
+}
+```
+
+`lever_type`: `"grinding"` | `"classification"` | `"flotation"` | `"reagents"` | `"new_equipment"` | `"automation"`.
+Правило матчинга (QA): совпадает `lever_type` И пересекается диагноз → кандидат на match,
+подтверждается вручную.
 
 ---
 
@@ -316,3 +507,6 @@ Engine граф не строит и не хранит.
 | 400 | некорректный запрос (неверная структура JSON) |
 | 422 | валидный JSON, но не прошёл бизнес-валидацию |
 | 500 | внутренняя ошибка сервиса |
+
+Отдельные коды: `"XLSX_PARSE_ERROR"` (diagnose не нашёл якорные маркеры),
+`"CHECKSUM_MISMATCH"` (расхождение > 5% — данные повреждены, 422).

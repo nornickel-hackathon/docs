@@ -5,14 +5,17 @@
 объяснимый, проверяемый портфель экспериментов.
 
 ## Поток (pipeline)
-1. **Вход:** KPI-контракт (+ ограничения) · корпус (локальная папка) · domain pack.
-2. **Python-сайдкар (волатильно):** парсинг док → claims по строгой схеме →
-   LLM-извлечение под валидатором → эмбеддинги/вектор-поиск → skeptic/narrator (LLM).
+1. **Вход:** KPI-контракт (+ цены металлов, ограничения) · xlsx-отчёт по хвостам ·
+   корпус литературы · domain pack · конфиг фабрики (factories/*.yaml).
+2. **Python-сайдкар (волатильно):** `/diagnose` — детерминированный парсер xlsx
+   (диагноз потерь, БЕЗ LLM) · `/extract` — claims из литературы (LLM под валидатором,
+   с постраничными ссылками) → эмбеддинги/вектор-поиск → narrator (LLM, P1).
    Отдаёт только JSON. Ничего не решает.
-3. **Rust-ядро (стабильно):** строит граф из claims → фиксирует snapshot+hash
-   (граница воспроизводимости) → Discovery Engine обходит граф НАЗАД от узла KPI
-   generic-операторами → Scoring + хард-фильтры (веса из pack) → Skeptic-rules →
-   собирает Hypothesis с trace.
+3. **Rust-ядро (стабильно):** строит граф из claims, диагноз-узлы получают тоннаж
+   из диагностики → фиксирует snapshot+hash (граница воспроизводимости) →
+   Discovery Engine обходит граф НАЗАД от узла KPI generic-операторами →
+   Scoring (kpi_impact от тонн × цены) + хард-фильтры (capex, доступность оборудования) →
+   Skeptic-rules → собирает Hypothesis с trace и economic_effect.
 4. **Rust-платформа:** Claim-стор (sqlite), axum-API, Tauri-оболочка (file dialog,
    скан папки, спавн сайдкара, десктоп-сборка).
 5. **TS-фронт:** доска-портфель (Pareto) · карточка (trace/score/skeptic/DOE) ·
@@ -59,15 +62,17 @@ pub fn discover(
 
 | Агент | Реализован в | P0 / P1 |
 |-------|-------------|---------|
-| Document Agent — парсинг txt/csv/pdf | Python sidecar | P0 |
-| Entity Resolver — нормализация синонимов | Python sidecar | P0 |
-| Graph Agent — строит petgraph из ExtractResponse | Rust platform | P0 |
-| Gap Agent — оператор gap в engine | Rust engine | P0 stretch / P1 |
+| Diagnostic Agent — детерминированный парсер xlsx хвостов | Python sidecar POST /diagnose | P0 (критический путь) |
+| Document Agent — парсинг txt/pdf постранично | Python sidecar | P0 |
+| Entity Resolver — нормализация синонимов (по pack.synonyms) | Python sidecar | P0 |
+| Graph Agent — petgraph из ExtractResponse + DiagnosticsReport | Rust platform | P0 |
+| Gap Agent — оператор gap (диагноз без доступного рычага) | Rust engine | P0 |
 | Contradiction Agent — оператор contradiction | Rust engine | P1 |
 | Analogy Agent — оператор analogy_transfer | Rust engine | P1 |
-| Scoring Agent — scoring + hard filters | Rust engine | P0 |
+| Scoring Agent — scoring + economic_effect + hard filters | Rust engine | P0 |
 | Skeptic/Critic Agent — skeptic_rules engine | Rust engine | P1 |
 | Narrator Agent — LLM объясняет hypothesis | Python sidecar POST /narrate | P1 |
+| Novelty Agent — близость к открытому корпусу | Python sidecar POST /novelty | P1 |
 | Experiment Agent — DOE plan | Rust engine (из pack) | P0 (базовый) |
 
 **Ключевой принцип:** агенты не фантазируют. Каждый имеет строгий JSON-вход и JSON-выход. LLM задействован только в Document/Entity/Narrator агентах.

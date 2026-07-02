@@ -6,12 +6,12 @@
 score_total = Σ (weight[dim] * score[dim])
 ```
 
-Веса берутся из `DomainPack.scoring_weights`. Дефолт для alloys-v1:
+Веса берутся из `DomainPack.scoring_weights`. Дефолт для flotation-v1:
 
 | Измерение    | Вес  |
 |-------------|------|
-| kpi_impact  | 0.30 |
-| evidence    | 0.25 |
+| kpi_impact  | 0.35 |
+| evidence    | 0.20 |
 | plausibility| 0.15 |
 | cost        | 0.15 |
 | risk        | 0.10 |
@@ -24,16 +24,21 @@ score_total = Σ (weight[dim] * score[dim])
 ## Как считается каждый компонент
 
 ### kpi_impact ∈ [0, 1]
-Сила причинного пути от controllable-фактора до KPI-узла.
+Экономический вес гипотезы: деньги, которые она адресует.
 
 ```
-path_claims = claims на всех рёбрах пути
-kpi_impact = mean(confidence[c] for c in path_claims)
+value_mid = addressable_tons[el]                # из диагноз-узла пути
+          * mid(recovery_gain_pct_range) / 100  # из claims (консервативно)
+          * prices_usd_per_t[el]                # из KpiContract
+kpi_impact = (value_mid / max_value_mid_в_портфеле)
+           * mean(confidence[c] for c in path_claims)
            * (1 - path_length_penalty)
 ```
 
 `path_length_penalty = 0.05 * max(0, len(path) - 2)` — длинные цепи штрафуются.
-Если пути нет → `kpi_impact = 0`.
+Если пути нет или addressable_tons = 0 → `kpi_impact = 0`.
+Тот же `value_usd_range` (lo/hi без нормировки) кладётся в `Hypothesis.economic_effect`
+вместе с assumptions — каждое число объяснимо.
 
 ### evidence ∈ [0, 1]
 Полнота и качество доказательной базы гипотезы.
@@ -53,16 +58,13 @@ plausibility = n_grounded_edges / total_edges_in_path
 ```
 
 ### cost ∈ [0, 1]
-Инверсия стоимостного нарушения. Берётся из cost-аннотации на factor-узле (если есть в claims).
+Инверсия капитальных затрат рычага: `capex_class` из properties factor-узла.
 
 ```
-если cost_delta <= constraint_value:
-    cost = 1.0
-иначе:
-    cost = constraint_value / cost_delta   # штраф пропорционален превышению
+cost = { 1: 1.0, 2: 0.7, 3: 0.35 }[capex_class]   # настройка / замена узла / новое оборудование
 ```
 
-Если cost_delta неизвестен → `cost = 0.7` (неопределённость, не штраф).
+Если capex_class неизвестен → `cost = 0.7` (неопределённость, не штраф).
 
 ### risk ∈ [0, 1]
 Инверсия рискованности: отсутствующие данные и противоречия снижают.
@@ -108,8 +110,9 @@ risk = 1.0
 1. Применяются `excluded_factors` — пути через исключённые узлы обнуляются.
 2. Применяются `weights_override` — обновляется весовой вектор.
 3. Применяются новые constraints — повторная проверка hard_constraint для всех гипотез.
-4. `score_total` пересчитывается по новым весам.
-5. Статусы переназначаются.
-6. Гипотезы ресортируются.
+4. `change_price` — пересчёт `economic_effect.value_usd_range` и `kpi_impact` всех гипотез.
+5. `score_total` пересчитывается по новым весам.
+6. Статусы переназначаются.
+7. Гипотезы ресортируются.
 
 `BoardResponse.snapshot.hash` остаётся тем же — граф не изменился. Frontend показывает diff рейтинга.
