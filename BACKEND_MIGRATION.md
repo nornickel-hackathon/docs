@@ -161,12 +161,30 @@ match controllable.capex_class() { Some(1)=>1.0, Some(2)=>0.7, Some(3)=>0.35, _=
 `rejected_by_constraints` (кроме gap-кандидатов: их смысл — новое оборудование;
 им constraint применять как обычный, если пользователь явно ограничил capex — тогда rejected).
 
-## 5. `crates/platform/src/web` — export
+## 5. `crates/platform/src/web` — export + HTTP-шов с фронтом
 
-`router.rs`: + `GET /export/board.json` (текущий BoardResponse как attachment),
+5.1. `router.rs`: + `GET /export/board.json` (текущий BoardResponse как attachment),
 + `GET /export/board.csv`: колонки
 `rank,id,title,status,score_total,value_usd_lo,value_usd_hi,capex_class,addressable_tons_28,trace`
 (trace через `;`). Требование ТЗ, полчаса работы.
+
+5.2. **HTTP-шов с фронтом — CONTRACTS.md, секция «HTTP-шов web ↔ platform»**
+(зафиксирована по факту готового фронта; формы отличаются от текущих хендлеров):
+- `POST /run`: body `{ factory_id, pack_id?, kpi_contract? }` (kpi_contract
+  опционален → дефолтный контракт по factory_id: target recoverable_losses_element_28
+  decrease, цены из fixtures). Ответ — **обёртка** `{ "run_id": "...", "board": BoardResponse }`
+  (run_id у тебя уже есть в MemoryRunRepository — просто верни его наружу).
+- `GET /board?run_id=` — по id; без run_id — последний прогон, иначе fallback
+  fixtures/board.json (текущее поведение сохранить).
+- `POST /rerun`: body `{ run_id, action }` (сейчас принимаешь голый RerunAction —
+  добавить обёртку; run_id обязателен).
+- + `GET /extract` — отдать текущий ExtractResponse (FileExtractSource уже есть).
+- + `GET /expert_hypotheses` — отдать файл `golden/expert_hypotheses.json` из base_dir.
+- **CORS НЕ добавлять**: фронт ходит через vite/nginx proxy `/api` → один origin.
+
+5.3. Приёмка шва: у фронта есть `frontend/scripts/verify-parity.mjs` — при живом
+бэке он гоняет /run + /rerun(change_price×2) и сверяет числа с эталоном. Он должен
+пройти — это и есть Интеграция I.
 
 ## 6. Данные и конфиг — один источник правды
 
