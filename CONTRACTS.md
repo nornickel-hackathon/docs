@@ -16,7 +16,7 @@
 | Сервис | Порт | Эндпоинты |
 |--------|------|-----------|
 | Python sidecar | 8765 | `GET /health`, `POST /extract`, `POST /diagnose`, P1: `POST /novelty` |
-| Rust platform (axum) | 8080 | `POST /run`, `POST /rerun`, `GET /board`, `GET /hypothesis/:id`, `GET /extract`, `GET /expert_hypotheses`, `GET /benchmark`, `GET /data_readiness`, `GET /trace/:id`, `GET /factories`, `GET /export/board.{json,csv}` |
+| Rust platform (axum) | 8080 | `POST /run`, `POST /rerun`, `GET /board`, `GET /hypothesis/:id`, `GET /extract`, `GET /expert_hypotheses`, `GET /benchmark`, `GET /data_readiness`, `GET /trace/:id`, `GET /roadmap`, `GET /factories`, `GET /export/board.{json,csv}` |
 | Frontend (Vite dev) | 5173 | — |
 
 Platform читает данные из каталога `NORNIKEL_ROOT` (по умолчанию `docs/`). Если задан
@@ -571,6 +571,26 @@ fixtures/board.json (404, если нет ни того ни другого — 
   "source_cells": [ { "cell_ref": "Итог!E44", "section": "rock", "size_class": "+71",
                "mineral_form": "closed_pnt_cp", "element": "element_28", "tons": 2088.28,
                "diagnosis": "liberation_deficit" } ] }
+```
+
+### GET /roadmap?run_id=&max_capex= → RoadmapPlan
+Рекомендованный план действий с **честной де-дубликацией стоимости**: гипотезы одного
+диагноза делят общий `addressable_tons`, поэтому их value не складывается. По каждому
+диагнозу берётся лучшее (обычно самое дешёвое эффективное) действие; стоимость
+суммируется только по РАЗНЫМ диагнозам и разносится по фазам capex. `max_capex` (1..3) —
+бюджет. Пример: наивная сумма по 11 гипотезам ≈ $87M, честный roadmap ≈ $13M.
+```json
+{ "factory_id": "kgmk", "max_capex_class": 3,
+  "total_value_usd_range": [4252215, 12756645], "covered_diagnoses": 2,
+  "uncovered_diagnoses": [],
+  "phases": [
+    { "capex_class": 1, "label": "Фаза 1 — быстрые настройки режима (capex 1)",
+      "value_usd_range": [4252215, 12756645],
+      "items": [ { "diagnosis": "liberation_deficit", "hypothesis_id": "hyp_001",
+                   "title": "Tune ...", "status": "recommended", "capex_class": 1,
+                   "value_usd_range": [3955050, 11865150],
+                   "addressable_tons": { "element_28": 4794.0 },
+                   "alternatives": ["hyp_002", "hyp_006", "..."] } ] } ] }
 ```
 
 ### GET /factories → [FactorySummary]

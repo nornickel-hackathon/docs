@@ -90,6 +90,16 @@ curl -s localhost:8080/trace/hyp_001 | jq '{claims: [.claims[] | {id, source_pag
 Ждём: `claim_001` со `source_page: 212` (учебник флотации) и ячейку `Итог!E44`
 (2088 т закрытого Pnt/Cp). Реплика: *«ни одно число не выдумано — клик до страницы и до ячейки xlsx»*.
 
+### 3-бис. Честный roadmap (де-дубликация денег) ⭐
+```sh
+curl -s localhost:8080/roadmap | jq '{total_value_usd_range, covered_diagnoses, phases: [.phases[] | {label, value_usd_range}]}'
+```
+Ждём: наивная сумма по 11 гипотезам ≈ **$87M** (двойной счёт — все делят один тоннаж
+диагноза), честный `total_value_usd_range ≈ [$4.25M, $12.76M]` по 2 разным механизмам
+потерь, и все действия — **capex 1 (быстрые настройки, без капзатрат)**.
+`GET /roadmap?max_capex=1` — «бюджетный ползунок». Реплика: *«не складываем все идеи в
+$87M — честно: ~$13M, и это ловится настройкой режима, без нового оборудования»*.
+
 ### 4. What-if по цене металла (live rerun)
 ```sh
 curl -sXPOST localhost:8080/rerun -H 'content-type: application/json' \
