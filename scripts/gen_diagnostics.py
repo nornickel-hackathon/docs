@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """gen_diagnostics.py — детерминированный парсер xlsx хвостов → DiagnosticsReport JSON.
 
-Это ядро будущего эндпоинта POST /diagnose (Роль 2 оборачивает parse_tails() в FastAPI).
+FROZEN-генератор фикстур (offline-выгрузка diagnostics_*.json). ИСТОЧНИК ПРАВДЫ
+по парсингу — `agent-system/app/pipeline/diagnose/parser.py`; при правках парсера
+перенести изменения сюда и перегенерировать fixtures (этот скрипт + validate_fixtures.py).
 Формат выхода — DiagnosticsReport из docs/CONTRACTS.md.
 
 Парсинг ЯКОРНЫЙ: структура файлов плавает между фабриками (КГМК/НОФ — одна секция
