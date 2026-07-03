@@ -1,7 +1,7 @@
 {
   "factory_id": "nof_med",
   "pack_id": "flotation-v1",
-  "source_file": "/Users/kaifarikman/projects/nornickel-hackathon/norn-hack/Пример 3/Хвосты НОФ мед.xlsx",
+  "source_file": "norn-hack/Пример 3/Хвосты НОФ мед.xlsx",
   "sections": [
     "rock"
   ],

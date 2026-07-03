@@ -1,7 +1,7 @@
 {
   "factory_id": "tof",
   "pack_id": "flotation-v1",
-  "source_file": "/Users/kaifarikman/projects/nornickel-hackathon/norn-hack/Пример 4/Хвосты ТОФ_2.xlsx",
+  "source_file": "norn-hack/Пример 4/Хвосты ТОФ_2.xlsx",
   "sections": [
     "rock",
     "pyrrhotite"

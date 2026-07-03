@@ -356,6 +356,10 @@ def main():
             print(f"[SKIP] {factory_id}: {path} не найден")
             continue
         report = parse_tails(path, factory_id)
+        # repo-relative, не абсолютный путь текущей машины: sidecar/_resolve_path
+        # резолвит относительные пути от REPO_ROOT (хостовый /app в docker), а
+        # baked-in абсолютный путь этой машины ломается в любом другом окружении.
+        report["source_file"] = f"norn-hack/{rel}"
         out = out_dir / f"diagnostics_{factory_id}.json"
         out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         n_cells = len(report["loss_cells"])

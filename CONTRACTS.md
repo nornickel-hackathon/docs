@@ -15,8 +15,8 @@
 ## Порты и эндпоинты
 | Сервис | Порт | Эндпоинты |
 |--------|------|-----------|
-| Python sidecar | 8765 | `GET /health`, `POST /extract`, `POST /diagnose`, P1: `POST /novelty` |
-| Rust platform (axum) | 8080 | `POST /run`, `POST /rerun`, `GET /board`, `GET /hypothesis/:id`, `GET /extract`, `GET /expert_hypotheses`, `GET /benchmark`, `GET /data_readiness`, `GET /trace/:id`, `GET /roadmap`, `GET /factories`, `GET /export/board.{json,csv}` |
+| Python sidecar | 8765 | `GET /health`, `POST /extract`, `POST /diagnose`, `POST /parse_constraints`, P1: `POST /novelty` |
+| Rust platform (axum) | 8080 | `POST /run`, `POST /rerun`, `POST /constraints/parse`, `GET /board`, `GET /hypothesis/:id`, `GET /extract`, `GET /expert_hypotheses`, `GET /benchmark`, `GET /data_readiness`, `GET /trace/:id`, `GET /roadmap`, `GET /factories`, `GET /export/board.{json,csv}` |
 | Frontend (Vite dev) | 5173 | — |
 
 Platform читает данные из каталога `NORNIKEL_ROOT` (по умолчанию `docs/`). Если задан
@@ -42,6 +42,10 @@ fallback (демо-страховка); иначе — из `fixtures/`.
 | `"nof_vkr"` | Пример 2 — НОФ вкрапленная |
 | `"nof_med"` | Пример 3 — НОФ медистая |
 | `"tof"` | Пример 4 — ТОФ (две секции хвостов: породные + пирротиновые) |
+
+Для скрытой фабрики `factory_id` — произвольная стабильная строка, а путь к xlsx
+передаётся через `RunRequest.source_file`; sidecar `/diagnose` не ограничивает id
+перечнем четырёх демо-фабрик.
 
 ---
 
@@ -485,11 +489,13 @@ prod: nginx `location /api/`). CORS-слой в platform НЕ добавляет
 ### POST /run
 ```json
 // запрос (kpi_contract опционален — дефолты бэка по factory_id)
-{ "factory_id": "kgmk", "pack_id": "flotation-v1", "kpi_contract": { } }
+{ "factory_id": "kgmk", "pack_id": "flotation-v1", "source_file": null, "kpi_contract": { } }
 // ответ 200
 { "run_id": "run_0001", "board": { } }
 ```
 `run_id` — идентификатор прогона в памяти platform; `board` — полный `BoardResponse`.
+`source_file` задаётся для новой/скрытой фабрики: platform вызывает живой sidecar
+`/diagnose` напрямую и не требует `fixtures/diagnostics_<factory_id>.json`.
 
 ### GET /board?run_id=run_0001
 → `BoardResponse` прогона. Без `run_id` — последний прогон, иначе fallback на
@@ -500,6 +506,42 @@ fixtures/board.json (404, если нет ни того ни другого — 
 { "run_id": "run_0001", "action": { "kind": "change_price", "payload": { } } }
 ```
 → `BoardResponse` (тот же `snapshot.hash`).
+
+### POST /constraints/parse
+> Frontend → Rust Platform. Platform добавляет текущий `kpi_contract`, `pack_id` и
+> controllable-факторы из run, затем проксирует в sidecar `POST /parse_constraints`.
+
+```json
+{ "run_id": "run_0001", "text": "цена элемента 28 = 33000, капзатраты запрещены" }
+```
+
+Ответ:
+```json
+{
+  "actions": [
+    { "kind": "change_price", "payload": { "element": "element_28", "usd_per_t": 33000 } },
+    { "kind": "add_constraint", "payload": { "metric": "capex_class", "op": "<=", "value": 1 } }
+  ],
+  "kpi_contract_patch": {},
+  "unparsed": []
+}
+```
+
+Нераспознанные фрагменты возвращаются в `unparsed`; parser не должен выдумывать actions.
+
+### POST /parse_constraints
+> Rust Platform → Python Sidecar.
+
+```json
+{
+  "text": "исключи гидроциклоны",
+  "kpi_contract": { },
+  "pack_id": "flotation-v1",
+  "factors": [{ "id": "node_hydrocyclone_nozzle", "label": "диаметр песковой насадки гидроциклона" }]
+}
+```
+
+Ответ — та же структура, что у `/constraints/parse`.
 
 ### GET /hypothesis/:id · GET /export/board.json · GET /export/board.csv
 Как описано выше; export отдаёт `Content-Disposition: attachment`.
