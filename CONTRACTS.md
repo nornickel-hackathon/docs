@@ -16,8 +16,12 @@
 | Сервис | Порт | Эндпоинты |
 |--------|------|-----------|
 | Python sidecar | 8765 | `GET /health`, `POST /extract`, `POST /diagnose`, P1: `POST /novelty` |
-| Rust platform (axum) | 8080 | `GET /board`, `GET /hypothesis/:id`, `POST /run`, `POST /rerun`, `GET /export/board.{json,csv}` |
+| Rust platform (axum) | 8080 | `POST /run`, `POST /rerun`, `GET /board`, `GET /hypothesis/:id`, `GET /extract`, `GET /expert_hypotheses`, `GET /benchmark`, `GET /data_readiness`, `GET /trace/:id`, `GET /factories`, `GET /export/board.{json,csv}` |
 | Frontend (Vite dev) | 5173 | — |
+
+Platform читает данные из каталога `NORNIKEL_ROOT` (по умолчанию `docs/`). Если задан
+env `SIDECAR_URL`, `/extract` и `/diagnose` берутся у живого сайдкара с файловым
+fallback (демо-страховка); иначе — из `fixtures/`.
 
 ---
 
@@ -206,7 +210,9 @@
 
 `properties` рычагов: `capex_class` — 1 = настройка режима, 2 = замена узла/детали,
 3 = новое оборудование; `equipment_required` — id оборудования из `factories/<factory_id>.yaml`
-(рычаг без такого оборудования на фабрике отсекается хард-фильтром `equipment_not_available`).
+(рычаг без такого оборудования на фабрике отсекается хард-фильтром `equipment_not_available`);
+`lever_type` — тип рычага для бенчмарка против экспертов (`grinding` | `classification` |
+`flotation` | `reagents` | `new_equipment` | `automation`, как в `ExpertHypothesis.lever_type`).
 
 Диагноз-узлы (`tags: ["diagnosis"]`) создаются platform-ом из pack и получают
 `properties.addressable_tons = { "element_28": 3005.0, "element_29": 411.2 }` из `diagnosis_summary`.
@@ -523,8 +529,58 @@ fixtures/board.json (404, если нет ни того ни другого — 
 ```
 
 `lever_type`: `"grinding"` | `"classification"` | `"flotation"` | `"reagents"` | `"new_equipment"` | `"automation"`.
-Правило матчинга (QA): совпадает `lever_type` И пересекается диагноз → кандидат на match,
-подтверждается вручную.
+Правило матчинга: совпадает `lever_type` И `diagnosis_hint` == диагноз гипотезы. Platform
+делает это автоматически (жадно, по рангу) и заполняет `Hypothesis.expert_match`.
+
+---
+
+## Аналитические эндпоинты (read-model поверх последнего/указанного прогона)
+
+Все принимают `?run_id=` (иначе — последний прогон).
+
+### GET /benchmark → BenchmarkReport
+Сколько эталонных гипотез экспертов «переоткрыл» engine.
+```json
+{
+  "factory_id": "kgmk",
+  "expert_total": 5,
+  "matched": 5,
+  "coverage_pct": 100.0,
+  "matches": [
+    { "expert_hypothesis_id": "kgmk_h3", "expert_text": "Замена песковых насадок...",
+      "hypothesis_id": "hyp_001", "hypothesis_title": "Tune ...",
+      "lever_type": "classification", "diagnosis": "liberation_deficit" }
+  ],
+  "unmatched_expert_ids": []
+}
+```
+
+### GET /data_readiness → DataReadiness
+Честность о качестве исходного xlsx (из `DiagnosticsReport.data_quality`).
+```json
+{ "factory_id": "kgmk", "readiness_pct": 62.5, "loss_cells": 55, "issues_total": 33,
+  "issues_by_type": { "ref_error": 33 }, "note": "55 loss cells parsed; 33 ... handled" }
+```
+
+### GET /trace/:hyp_id → TraceReport
+Трассировка гипотезы до первоисточников: claims (с `source_page`) и ячейки xlsx (`cell_ref`).
+```json
+{ "hypothesis_id": "hyp_001",
+  "claims": [ { "id": "claim_001", "text": "...", "source_ref": "doc_flotation_methods",
+               "source_page": 212, "evidence_type": "literature" } ],
+  "source_cells": [ { "cell_ref": "Итог!E44", "section": "rock", "size_class": "+71",
+               "mineral_form": "closed_pnt_cp", "element": "element_28", "tons": 2088.28,
+               "diagnosis": "liberation_deficit" } ] }
+```
+
+### GET /factories → [FactorySummary]
+Мультифабричная карта денег (прогон по всем фабрикам кейса).
+```json
+[ { "factory_id": "kgmk", "sections": ["rock"],
+    "recoverable_tons": { "element_28": 7564.1, "element_29": 4229.8 },
+    "opportunity_usd_mid": 16499044.0, "n_hypotheses": 11, "n_recommended": 5,
+    "top_hypothesis": "Tune ...", "expert_coverage_pct": 100.0 } ]
+```
 
 ---
 
