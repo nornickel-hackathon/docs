@@ -47,6 +47,10 @@ operators:
   - substitution
   - gap
 
+# Консервативный диапазон прироста извлечения для economic_effect,
+# когда у конкретного пути нет своего диапазона из claims (см. SCORING.md).
+default_gain_pct_range: [5, 15]
+
 scoring_weights:
   kpi_impact:   0.35   # ∝ addressable_tons × recovery_gain × price (из KpiContract)
   evidence:     0.20
