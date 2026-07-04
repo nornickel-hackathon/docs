@@ -857,6 +857,14 @@
         "location": "Итог!G39",
         "handling": "treated_as_zero"
       }
+    ],
+    "diag_refs": [
+      { "id": "diag_kgmk_closed_71", "cell_ref": "Итог!E44", "size_class": "+71", "mineral_form": "closed_pnt_cp", "diagnosis": "liberation_deficit" },
+      { "id": "diag_kgmk_closed_71_45", "cell_ref": "Итог!E59", "size_class": "-71 + 45", "mineral_form": "closed_pnt_cp", "diagnosis": "liberation_deficit" },
+      { "id": "diag_kgmk_closed_45_20", "cell_ref": "Итог!E74", "size_class": "-45 + 20", "mineral_form": "closed_pnt_cp", "diagnosis": "liberation_deficit" },
+      { "id": "diag_kgmk_closed_20_10", "cell_ref": "Итог!E89", "size_class": "-20 + 10", "mineral_form": "closed_pnt_cp", "diagnosis": "liberation_deficit" },
+      { "id": "diag_kgmk_open_20_10", "cell_ref": "Итог!E88", "size_class": "-20 + 10", "mineral_form": "open_pnt_cp", "diagnosis": "flotation_kinetics" },
+      { "id": "diag_kgmk_open_10", "cell_ref": "Итог!E103", "size_class": "-10", "mineral_form": "open_pnt_cp", "diagnosis": "slimes_overgrinding" }
     ]
   },
   "hypotheses": [
@@ -894,6 +902,7 @@
         ]
       },
       "trace": [
+        "diag_kgmk_closed_71",
         "claim_001",
         "claim_002",
         "claim_003",
@@ -925,7 +934,7 @@
         ],
         "minimum_runs": 6
       },
-      "expert_match": null
+      "expert_match": { "matched": true, "expert_hypothesis_id": "kgmk_h3" }
     },
     {
       "id": "hyp_002",
@@ -961,6 +970,7 @@
         ]
       },
       "trace": [
+        "diag_kgmk_closed_45_20",
         "claim_004",
         "claim_014",
         "claim_003"
@@ -991,7 +1001,7 @@
         ],
         "minimum_runs": 4
       },
-      "expert_match": null
+      "expert_match": { "matched": true, "expert_hypothesis_id": "kgmk_h2" }
     },
     {
       "id": "hyp_004",
@@ -1027,6 +1037,7 @@
         ]
       },
       "trace": [
+        "diag_kgmk_closed_71_45",
         "claim_011",
         "claim_002",
         "claim_003"
@@ -1058,7 +1069,7 @@
         ],
         "minimum_runs": 5
       },
-      "expert_match": null
+      "expert_match": { "matched": true, "expert_hypothesis_id": "kgmk_h1" }
     },
     {
       "id": "hyp_003",
@@ -1094,6 +1105,7 @@
         ]
       },
       "trace": [
+        "diag_kgmk_open_20_10",
         "claim_009",
         "claim_016"
       ],
@@ -1156,6 +1168,7 @@
         ]
       },
       "trace": [
+        "diag_kgmk_closed_20_10",
         "claim_012",
         "claim_002",
         "claim_016"
@@ -1185,7 +1198,7 @@
         ],
         "minimum_runs": 6
       },
-      "expert_match": null
+      "expert_match": { "matched": true, "expert_hypothesis_id": "kgmk_h5" }
     },
     {
       "id": "hyp_006",
@@ -1221,6 +1234,7 @@
         ]
       },
       "trace": [
+        "diag_kgmk_open_10",
         "claim_013",
         "claim_014",
         "claim_006",

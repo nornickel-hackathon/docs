@@ -211,8 +211,8 @@
     { "id": "node_diag_liberation_deficit", "kind": "property", "label": "потери: недораскрытие сростков", "tags": ["diagnosis"], "properties": { "diagnosis": "liberation_deficit" } },
     { "id": "node_diag_slimes_overgrinding", "kind": "property", "label": "потери: переизмельчение/шламы", "tags": ["diagnosis"], "properties": { "diagnosis": "slimes_overgrinding" } },
     { "id": "node_diag_flotation_kinetics", "kind": "property", "label": "потери: кинетика/режим флотации", "tags": ["diagnosis"], "properties": { "diagnosis": "flotation_kinetics" } },
-    { "id": "node_recoverable_losses_element_28", "kind": "kpi", "label": "извлекаемые потери element_28 с хвостами", "tags": ["kpi"], "properties": { "unit": "t" } },
-    { "id": "node_recoverable_losses_element_29", "kind": "kpi", "label": "извлекаемые потери element_29 с хвостами", "tags": ["kpi"], "properties": { "unit": "t" } }
+    { "id": "node_recoverable_losses_element_28", "kind": "kpi", "label": "извлекаемые потери элемента 28 с хвостами", "tags": ["kpi"], "properties": { "unit": "t" } },
+    { "id": "node_recoverable_losses_element_29", "kind": "kpi", "label": "извлекаемые потери элемента 29 с хвостами", "tags": ["kpi"], "properties": { "unit": "t" } }
   ],
   "edges": [
     { "id": "edge_001", "src": "node_hydrocyclone_nozzle", "dst": "node_separation_size", "edge_type": "mechanism", "mechanism": "classification_cut_size", "source_claims": ["claim_001"], "polarity": "negative" },

@@ -121,7 +121,7 @@ fallback (демо-страховка); иначе — из `fixtures/`.
 | Поле | Тип | Описание |
 |------|-----|----------|
 | `docs[].path` | string | путь к файлу (относительный от корня проекта) |
-| `docs[].mime` | enum | `"text/plain"` \| `"text/csv"` \| `"application/pdf"` |
+| `docs[].mime` | enum | `"text/plain"` \| `"text/csv"` \| `"application/pdf"` \| `"application/vnd.openxmlformats-officedocument.wordprocessingml.document"` (docx) |
 | `pack_id` | string | id domain pack, используется для нормализации |
 
 ---
